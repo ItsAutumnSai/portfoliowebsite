@@ -22,7 +22,21 @@ class ContentController extends Controller
             'description' => 'required|string',
         ]);
 
-        $imagePath = $request->file('image')->store('portfolios', 'public');
+        // Store directly in public/storage/portfolios
+        $image = $request->file('image');
+        $imageName = time() . '_' . $image->getClientOriginalName();
+        
+        // Ensure the directory exists
+        $uploadPath = public_path('storage/portfolios');
+        if (!file_exists($uploadPath)) {
+            mkdir($uploadPath, 0755, true);
+        }
+        
+        // Move the file to public/storage/portfolios
+        $image->move($uploadPath, $imageName);
+        
+        // Store relative path in database
+        $imagePath = 'portfolios/' . $imageName;
 
         Content::create([
             'portfolio_id' => $portfolioId,
@@ -43,7 +57,13 @@ class ContentController extends Controller
         }
 
         $content = Content::findOrFail($id);
-        Storage::disk('public')->delete($content->image_path);
+        
+        // Delete from public/storage instead of storage/app/public
+        $filePath = public_path('storage/' . $content->image_path);
+        if (file_exists($filePath)) {
+            unlink($filePath);
+        }
+        
         $content->delete();
 
         return back()->with('success', 'Content deleted successfully!');
